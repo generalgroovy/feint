@@ -1,0 +1,16 @@
+import {RIVALS,initial,intent,stepLabel,act} from './model.mjs';const $=id=>document.getElementById(id);let state=initial(),history=[];
+const tells={step:['Step in','They move one tile closer. Movement happens before attacks.'],strike:['Strike','They attack the adjacent tile for 2 damage.'],guard:['Guard','They counter an adjacent strike for 1 damage.'],retreat:['Step back','They move one tile away before attacks.']};
+RIVALS.forEach((r,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`${i+1}. ${r.name}`;$('rival').append(o);});
+for(let i=0;i<7;i++){const cell=document.createElement('div');cell.className='tile';$('lane').append(cell);}
+function render(){
+ $('turn').textContent=`Turn ${state.turn+1}`;$('health').textContent=`${state.hp} / 5 hearts`;$('enemy-health').textContent=`${state.ehp} / 5 hearts`;$('enemy').textContent=`◆ ${RIVALS[state.rival].name}`;
+ [...$('lane').children].forEach((c,i)=>{c.textContent=i===state.p?'▲':i===state.e?'◆':'·';c.className=`tile ${i===state.p?'player':i===state.e?'enemy':''}`;});$('lane').setAttribute('aria-label',`You on tile ${state.p+1}, ${RIVALS[state.rival].name} on tile ${state.e+1}, of 7 tiles.`);
+ $('distance').textContent=state.e-state.p===1?'Adjacent · strikes can reach':`${state.e-state.p-1} empty ${state.e-state.p===2?'tile':'tiles'} between you`;
+ const t=tells[intent(state)];$('intent').textContent=state.done?'Duel complete':t[0];$('explain').textContent=state.done?'Retry, undo, or choose another rival.':t[1];$('step').textContent=stepLabel(state);$('guard').querySelector('small').textContent=state.guardReady?'Parry a strike':'Tired · will not block';$('guard-state').textContent=state.guardReady?'Guard ready · a successful parry deals 1 damage.':'Guard tired · Step or Strike to restore it.';
+ for(const id of ['step','strike','guard'])$(id).disabled=state.done;$('undo').disabled=!history.length;$('next').hidden=!state.won||state.rival===RIVALS.length-1;
+ $('log').replaceChildren();state.log.slice(-5).forEach(entry=>{const li=document.createElement('li');li.textContent=`Turn ${entry.turn}: ${entry.lines.join(' ')}`;$('log').append(li);});if(!state.log.length){const li=document.createElement('li');li.textContent='Your first move starts the duel.';$('log').append(li);}
+}
+function move(action){const next=act(state,action);if(next===state)return;history.push(state);state=next;render();const words=state.log.at(-1).lines.join(' ');$('status').textContent=state.done?`${words} ${state.won?'You win!':state.hp===0&&state.ehp===0?'A draw. Both final strikes connected.':'Duel lost. Undo and try another reply.'}`:words;if(state.done)($('next').hidden?$('retry'):$('next')).focus();}
+function load(i){state=initial(i);history=[];$('rival').value=i;render();$('status').textContent=`${RIVALS[i].tag}. Step in to close the distance, then read their next move.`;}
+for(const id of ['step','strike','guard'])$(id).onclick=()=>move(id);
+$('undo').onclick=()=>{if(history.length){state=history.pop();render();$('status').textContent='Last turn undone. Their next move is the same; try another reply.';if($('undo').disabled)$('step').focus();}};$('retry').onclick=()=>{load(state.rival);$('step').focus();};$('next').onclick=()=>{load(state.rival+1);$('step').focus();};$('rival').onchange=()=>load(Number($('rival').value));load(0);
